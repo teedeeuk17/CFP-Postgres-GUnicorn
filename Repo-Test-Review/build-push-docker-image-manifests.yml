@@ -1,0 +1,89 @@
+ # Deploy to Azure Kubernetes Service
+# Build and push image to Azure Container Registry; Deploy to Azure Kubernetes Service
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+ # Deploy to Azure Kubernetes Service
+
+trigger:
+- main
+
+name: $(TeamProject)_$(BuildDefinitionName)_$(SourceBranchName)_$(Date:yyyyMMdd)$(Rev:.r)
+resources:
+- repo: self
+
+
+pool: Default
+
+
+
+
+variables:
+  # Container registry service connection established during pipeline creation
+  dockerRegistryServiceConnection: 'c7f77a48-fac0-4aa9-96d4-485376591179'
+  postgresImageRepository: 'cfp-postgres-sql'
+  gUnicornWebApp: 'cfp-gunicorn'
+  containerRegistry: 'acrproductiveuks001.azurecr.io'
+  adoconnection: ado
+  aksendpointname: 'aks-prod-ado-default' 
+  aksclustername: 'aks-prod-ado' 
+  aksresourcegroup: 'rg-aks-uks' 
+
+
+
+
+
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+
+  tag: '$(Build.BuildId)'
+
+ 
+
+stages:
+- stage: Build
+  displayName: Build and push stage
+  jobs:
+  - job: Build
+    displayName: Build
+    pool: Default
+    steps:
+
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush
+        repository: $(postgresImageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+          
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush
+        repository: $(gUnicornWebApp)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+
+    - task: CopyFiles@2
+      displayName: 'Copy Files to: $(Build.ArtifactStagingDirectory)'
+      inputs:
+        SourceFolder: $(Build.SourcesDirectory)
+        TargetFolder: $(Build.ArtifactStagingDirectory)
+
+    - task: KubernetesManifest@1
+      displayName: Deploy to the new namespace in the Kubernetes cluster
+      inputs:
+        action: deploy
+        connectionType: azureResourceManager
+        azureSubscriptionConnection: $(adoconnection)
+        kubernetesServiceEndpoint: $(aksendpointname)
+        kubernetesCluster: $(aksclustername)
+        azureResourceGroup: $(aksresourcegroup)
+        namespace: 'aks-main'
+        manifests: '$(Build.ArtifactStagingDirectory)/manifests/*.yml'       #'manifests/*.yaml'
+        containers: 'acrproductiveuks001.azurecr.io/cfp-postgres-sql:$(tag)'
+        #helmChart:
+      

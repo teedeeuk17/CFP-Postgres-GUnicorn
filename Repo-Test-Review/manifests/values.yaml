@@ -1,0 +1,42 @@
+environment: production
+
+apphost: k8s
+
+label:
+  name: postgrekeyrotation
+
+productionSlot: blue
+blue:
+  enabled: true
+  tag: 132
+  connectionString:
+    roleName: pgapproleblue
+    mountPoint: /mnt/keyvault/pgmainbluepwd
+
+green:
+  enabled: true
+  tag: 132
+  connectionString:
+    roleName: pgapprolegreen
+    mountPoint: /mnt/keyvault/pgmaingreenpwd
+
+azure:
+  resourceGroupName: rg-postgres-KeyRotation
+  keyVaultName: kv1-spoke-prod-uks
+  applicationGatewayName: appgw-prod-uks
+  subscriptionId: 68140ec4-4057-477a-8982-73b8cb5b6fe8
+  tenantId: 6cd63f1f-b203-45e0-a491-b06acb3bc3bf
+
+connectionString:
+  template: <connection-string-template>
+
+container:
+  name: postgrekeyrotation
+  pullPolicy: IfNotPresent
+  image: acrproductiveuks001.azurecr.io/cfp-postgres-sql
+  port: 80
+replicas: 1
+
+service:
+  port: 80
+  type: ClusterIP
